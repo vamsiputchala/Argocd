@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: spring-boot-app
-        image: abhishekf5/ultimate-cicd:replaceImageTag  # Placeholder for the build number
+        image: abhishekf5/ultimate-cicd:10  # Placeholder for the build number
 
         ports:
         - containerPort: 8080
