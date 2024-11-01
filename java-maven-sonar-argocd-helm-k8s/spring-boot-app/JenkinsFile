@@ -50,7 +50,12 @@ pipeline {
             GIT_REPO_NAME = "Argocd"
             GIT_USER_NAME = "vamsiputchala"
         }
-        steps {
+       stage('Update Deployment File') {
+    environment {
+        GIT_REPO_NAME = "Argocd"
+        GIT_USER_NAME = "vamsiputchala"
+    }
+    steps {
         withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
             sh '''
                 set -e  # Exit immediately if a command exits with a non-zero status
@@ -58,12 +63,17 @@ pipeline {
                 git config user.name "vamsiputchala"
                 
                 BUILD_NUMBER=${BUILD_NUMBER}
+                echo "Building version: ${BUILD_NUMBER}"
+
+                # Replace the placeholder in the deployment YAML
                 sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
                 
-                # Add the modified file
+                # Debugging: Show the content of the updated YAML
+                cat java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
+
                 git add java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
 
-                # Check if there are any changes to commit
+                # Check for changes and commit
                 if ! git diff --cached --quiet; then
                     git commit -m "Update deployment image to version ${BUILD_NUMBER}"
                     git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
