@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: spring-boot-app
-        image: vamsi1011/ultimate-cicd: # Placeholder for the build number
+        image: vamsi1011/ultimate-cicd:replaceImageTag # Placeholder for the build number
         #imagePullPolicy: Always
         ports:
         - containerPort: 8080
