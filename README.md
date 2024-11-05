@@ -143,12 +143,155 @@ cd sonarqube-9.4.0.54424/bin/linux-x86-64/
 
 ## Jenkins Pipeline Documentation
 Prerequisites
- 1.Docker: Docker must be installed on the Jenkins agent and have permission to access the Docker daemon (/var/run/docker.sock).
- 2.Jenkins Plugins:
+## 1.Docker: 
+   Docker must be installed on the Jenkins agent and have permission to access the Docker daemon (/var/run/docker.sock).
+## 2.Jenkins Plugins:
 - Docker Pipeline: Required to use Docker commands within the pipeline.
 - Git Plugin: For cloning the repository.
 - SonarQube Scanner: For static code analysis with SonarQube.
-Credentials:
-GitHub Token: Named github in Jenkins, with permissions to clone and push to the repository.
-SonarQube Token: Named sonarqube, with permissions to submit analysis to the SonarQube server.
-Docker Hub Credentials: Named docker-cred in Jenkins, with permissions to push images to Docker Hub.
+## Credentials:
+- GitHub Token: Named github in Jenkins, with permissions to clone and push to the repository.
+- SonarQube Token: Named sonarqube, with permissions to submit analysis to the SonarQube server.
+- Docker Hub Credentials: Named docker-cred in Jenkins, with permissions to push images to Docker Hub.
+
+## Pipeline Breakdown
+The Jenkins pipeline is a declarative pipeline using a Docker agent. Below are explanations for each stage.
+
+## 1. Agent Configuration
+The pipeline runs on a Docker agent, specifically vamsi1011/maven-vamsi-docker-agent:v1, which has Maven and Docker installed 
+```
+agent {
+    docker {
+      image 'vamsi1011/maven-vamsi-docker-agent:v1'
+      args '--user root -v /var/run/docker.sock:/var/run/docker.sock' // Mount Docker socket for Docker access
+    }
+  }
+```
+
+- image: Docker image to be used as the Jenkins agent.
+- args: The --user root allows root access, and -v /var/run/docker.sock:/var/run/docker.sock provides access to the host's Docker daemon.
+## 2. Stages
+Each stage represents a different phase in the CI/CD pipeline.
+## Stage 1: Checkout
+This stage checks out the code from the GitHub repository.
+```
+stage('Checkout') {
+  steps {
+    git branch: 'main', url: 'git@github.com:vamsiputchala/Argocd.git', credentialsId: 'github'
+  }
+}
+```
+- branch: The branch to clone (in this case, main).
+- url: URL of the GitHub repository.
+- credentialsId: github credentials are used for authentication
+## Stage 2: Build and Test
+This stage compiles the project, runs tests, and generates a JAR file using Maven.
+```
+stage('Build and Test') {
+  steps {
+    sh 'ls -ltr'
+    sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn clean package'
+  }
+}
+```
+- ls -ltr: Lists files to confirm the working directory.
+- mvn clean package: Builds the project and creates a JAR file in the spring-boot-app directory.
+
+  
+  ![Screenshot 2024-11-05 190436](https://github.com/user-attachments/assets/2dbac25d-7d5a-47c5-bb15-0bca95dac70b)
+
+## Stage 3: Static Code Analysis
+In this stage, SonarQube performs static code analysis to detect code smells, vulnerabilities, and other quality issues.
+```
+stage('Static Code Analysis') {
+  environment {
+    SONAR_URL = "http://3.144.199.42:9000"
+  }
+  steps {
+    withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
+      sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && mvn sonar:sonar -Dsonar.login=$SONAR_AUTH_TOKEN -Dsonar.host.url=${SONAR_URL}'
+    }
+  }
+}
+```
+- SONAR_URL: URL of the SonarQube server.
+- withCredentials: Injects the SonarQube token (SONAR_AUTH_TOKEN) for authentication.
+- mvn sonar
+  : Executes the SonarQube analysis with the provided URL and token.
+
+  
+![Screenshot 2024-11-05 190531](https://github.com/user-attachments/assets/e39393c9-b295-4384-96d6-b83ef037d307)
+
+
+## Stage 4: Build and Push Docker Image
+This stage builds a Docker image from the project and pushes it to Docker Hub
+```
+stage('Build and Push Docker Image') {
+  environment {
+    DOCKER_IMAGE = "vamsi1011/ultimate-cicd:${BUILD_NUMBER}"
+  }
+  steps {
+    script {
+      sh 'cd java-maven-sonar-argocd-helm-k8s/spring-boot-app && docker build -t ${DOCKER_IMAGE} .'
+      def dockerImage = docker.image("${DOCKER_IMAGE}")
+      docker.withRegistry('https://index.docker.io/v1/', "docker-cred") {
+        dockerImage.push()
+      }
+    }
+  }
+}
+```
+- DOCKER_IMAGE: The Docker image tag, using Jenkins’ BUILD_NUMBER for versioning.
+- docker build: Builds the Docker image from the spring-boot-app directory.
+- docker.withRegistry: Logs in to Docker Hub with docker-cred and pushes the image.
+
+
+  ![Screenshot 2024-11-05 190655](https://github.com/user-attachments/assets/99876a65-0cdc-4c74-84af-d3e8e204dd6e)
+
+## Stage 5: Update Deployment File
+This stage updates the Kubernetes deployment file with the new Docker image tag, commits the change to Git, and pushes the updated file to GitHub.
+```
+stage('Update Deployment File') {
+  environment {
+    GIT_REPO_NAME = "Argocd"
+    GIT_USER_NAME = "vamsiputchala"
+  }
+  steps {
+    withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+      sh '''
+        git config user.email "vamsiputchala@gmail.com"
+        git config user.name "vamsiputchala"
+        BUILD_NUMBER=${BUILD_NUMBER}
+        sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
+        git add java-maven-sonar-argocd-helm-k8s/spring-boot-app-manifests/deployment.yml
+        git commit -m "Update deployment image to version ${BUILD_NUMBER}"
+        git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
+      '''
+    }
+  }
+}
+```
+- GITHUB_TOKEN: Token for authenticating the Git push operation.
+- sed -i: Replaces replaceImageTag in the deployment YAML file with the BUILD_NUMBER.
+- git push: Pushes the updated YAML file to the main branch.
+
+  
+  ![Screenshot 2024-11-05 190739](https://github.com/user-attachments/assets/5af9c18b-a0df-46a4-9a43-b9e2193e0cc8)
+
+  ## Finally deployed in Argocd  pods:
+  
+  
+  ![Screenshot 2024-11-05 191413](https://github.com/user-attachments/assets/a7fadd0f-85dc-4cf6-ab75-0e0a119246f6)
+
+## Summary
+## This Jenkins pipeline automates the following steps:
+
+## 1.Clone the Code from GitHub.
+## 2.Build and Test the Maven project.
+## 3.Perform Static Code Analysis using SonarQube.
+## 4.Build and Push a Docker image to Docker Hub.
+## 5.Update the Deployment File in the GitHub repository.
+This setup enables Continuous Integration and Continuous Deployment (CI/CD) for a Spring Boot application with a Kubernetes deployment setup managed by Argo CD. Each build updates the image tag in the deployment manifest, which Argo CD can then automatically synchronize with the Kubernetes cluster.
+
+
+
