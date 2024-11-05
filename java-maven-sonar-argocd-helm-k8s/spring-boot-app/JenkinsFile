@@ -10,7 +10,7 @@ pipeline {
       steps {
         sh 'echo passed'
         //git branch: 'main', url: 'git@github.com:vamsiputchala/Argocd.git
-'
+
       }
     }
     stage('Build and Test') {
