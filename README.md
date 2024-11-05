@@ -141,3 +141,14 @@ cd sonarqube-9.4.0.54424/bin/linux-x86-64/
 
  Now you can access the `SonarQube Server` on `http://<ip-address>:9000` 
 
+## Jenkins Pipeline Documentation
+Prerequisites
+ 1.Docker: Docker must be installed on the Jenkins agent and have permission to access the Docker daemon (/var/run/docker.sock).
+ 2.Jenkins Plugins:
+- Docker Pipeline: Required to use Docker commands within the pipeline.
+- Git Plugin: For cloning the repository.
+- SonarQube Scanner: For static code analysis with SonarQube.
+Credentials:
+GitHub Token: Named github in Jenkins, with permissions to clone and push to the repository.
+SonarQube Token: Named sonarqube, with permissions to submit analysis to the SonarQube server.
+Docker Hub Credentials: Named docker-cred in Jenkins, with permissions to push images to Docker Hub.
