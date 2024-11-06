@@ -153,6 +153,7 @@ Prerequisites
 - GitHub Token: Named github in Jenkins, with permissions to clone and push to the repository.
 - SonarQube Token: Named sonarqube, with permissions to submit analysis to the SonarQube server.
 - Docker Hub Credentials: Named docker-cred in Jenkins, with permissions to push images to Docker Hub.
+## Configure github Webhook in jenkins & jenkins url in webhooks
 
 ## Pipeline Breakdown
 The Jenkins pipeline is a declarative pipeline using a Docker agent. Below are explanations for each stage.
@@ -293,5 +294,14 @@ stage('Update Deployment File') {
 ## 5.Update the Deployment File in the GitHub repository.
 This setup enables Continuous Integration and Continuous Deployment (CI/CD) for a Spring Boot application with a Kubernetes deployment setup managed by Argo CD. Each build updates the image tag in the deployment manifest, which Argo CD can then automatically synchronize with the Kubernetes cluster.
 
-
+## Troubleshhoting:
+If jenkins fils to start with space issue
+```
+sudo chmod -R 755 /var/lib/jenkins/workspace/project-demo
+sudo chown -R jenkins:jenkins /var/lib/jenkins/workspace/project-demo
+```
+If Argocd expose error
+```
+kubectl port-forward svc/argocd-server -n argocd --address 0.0.0.0 8080:443
+```
 
